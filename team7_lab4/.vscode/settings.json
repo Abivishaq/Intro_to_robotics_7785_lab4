@@ -1,0 +1,18 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/abivishaq/turtle_ws/build/team7_lab4",
+        "/home/abivishaq/turtle_ws/install/team7_lab4/lib/python3.10/site-packages",
+        "/home/abivishaq/turtle_ws/build/master_oogway_object_follower",
+        "/home/abivishaq/turtle_ws/install/master_oogway_object_follower/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/abivishaq/turtle_ws/build/team7_lab4",
+        "/home/abivishaq/turtle_ws/install/team7_lab4/lib/python3.10/site-packages",
+        "/home/abivishaq/turtle_ws/build/master_oogway_object_follower",
+        "/home/abivishaq/turtle_ws/install/master_oogway_object_follower/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

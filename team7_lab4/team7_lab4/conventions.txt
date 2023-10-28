@@ -1,0 +1,3 @@
+go_to_point service
+request: pose x,y point 
+         onlyAngular T/F if only you need to rotate to goal. If true only rotate to goal no linear movements

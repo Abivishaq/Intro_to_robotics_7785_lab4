@@ -1,0 +1,5 @@
+1. ros2 launch turtlebot3_gazebo empty_world.launch.py
+2. ros2 run team7_lab4 goToPos
+3. ros2 run team7_lab4 path_test_bed
+4. ros2 run team7_lab4 chase_goal
+5. ros2 run team7_lab4 path_executor
