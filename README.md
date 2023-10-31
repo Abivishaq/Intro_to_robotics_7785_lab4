@@ -39,3 +39,9 @@ ros2 run team7_lab4 corner_pointer
 ```
 ros2 run team7_lab4 path_planner
 ```
+
+#### simulation 
+to run on simulation run this command before all other nodes:
+```
+ros2 launch turtlebot3_gazebo empty_world.launch.py
+```
