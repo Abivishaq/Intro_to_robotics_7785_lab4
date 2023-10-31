@@ -1,5 +1,5 @@
 # Note: copilot used for helping in development but main code logic is ours or reference below:
-# chatGPT used for debugging
+# chatGPT used for debugging and path specific to package
 # references:
 
 import rclpy
@@ -10,17 +10,24 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from team7_mgs_srvs.srv import GoToPointSrv,GetTargetSrv
 import math
+from ament_index_python.packages import get_package_share_directory
+import os
+import sys
+
 
 
 class PathPlanner(Node):
     def __init__(self):
         super().__init__('path_planner')
        
-        self.dist_threshold = 0.05
+        self.dist_threshold = 0.1
         self.goal = None
-        self.waypoints = self.get_waypoints('/home/abivishaq/turtle_ws/src/team7_lab4/team7_lab4/waypoints.txt')
+        wypt_file = '/home/abivishaq/turtle_ws/src/Intro_to_robotics_7785_lab4/team7_lab4/team7_lab4/config/waypoints.txt'
+        self.waypoints = self.get_waypoints(wypt_file)
         self.curr_waypoint_index = -1
         
+        self.transition_wait_time = 5
+        self.inwait_state = False
     
         self.target_pub = self.create_publisher(Point, 'target_pos', 10)
         self.reached_trg_sub = self.create_subscription(
@@ -45,8 +52,9 @@ class PathPlanner(Node):
         self.ROTATE_STATE = 1
         self.GO_TO_POINT_STATE = 2
         self.GET_TARGET_STATE = 3
+        self.ROTATE_TO_POINT = 4
         self.state_of_planner = self.IDLE_STATE
-        self.state_to_text = {self.IDLE_STATE:"IDLE_STATE",self.ROTATE_STATE:"ROTATE_STATE",self.GO_TO_POINT_STATE:"GO_TO_POINT_STATE",self.GET_TARGET_STATE:"GET_TARGET_STATE"}
+        self.state_to_text = {self.IDLE_STATE:"IDLE_STATE",self.ROTATE_STATE:"ROTATE_STATE", self.ROTATE_TO_POINT:"ROTATE_TO_POINT",self.GO_TO_POINT_STATE:"GO_TO_POINT_STATE",self.GET_TARGET_STATE:"GET_TARGET_STATE"}
 
         
     # def scan_callback(self, msg):
@@ -54,10 +62,19 @@ class PathPlanner(Node):
     def reached_trg_callback(self,msg):
         self.target_reached = True
         self.last_reached_trg = msg
+        if(self.state_of_planner == self.ROTATE_STATE):
+            self.inwait_state = True
+            self.wait_start_time = self.get_clock().now().nanoseconds/1e9
 
     def rec_target_callback(self,msg):
-        self.target_location = msg
-        self.target_reached = True
+        if(msg.z == -2.0):
+            self.target_request_pub.publish(self.goal)
+            #self.target_reached = False
+            #self.target_pub.publish(msg)
+        else:
+            self.target_location = msg
+            self.target_reached = True
+
     
     def get_waypoints(self,filename):
         f = open(filename,'r')
@@ -81,6 +98,12 @@ class PathPlanner(Node):
             return False
     def execute_goal(self):
         print('state_of_planner:',self.state_to_text[self.state_of_planner])
+        if(self.inwait_state):
+            dt = self.get_clock().now().nanoseconds/1e9 - self.wait_start_time
+            print("dt:"+str(dt))
+            if(self.get_clock().now().nanoseconds/1e9 - self.wait_start_time > self.transition_wait_time):
+                self.inwait_state = False
+            return
         if(self.waypoint_reached==False):
             if(self.target_reached):
                 if(self.state_of_planner == self.IDLE_STATE):
@@ -116,11 +139,15 @@ class PathPlanner(Node):
                 
                 elif(self.state_of_planner == self.GET_TARGET_STATE): 
                     self.target_reached = False
+                    self.state_of_planner = self.ROTATE_TO_POINT
+                    # self.state_of_planner = self.GO_TO_POINT_STATE
+                    self.target_location.z = -1.0
+                    self.target_pub.publish(self.target_location)
+                elif(self.state_of_planner == self.ROTATE_TO_POINT):
+                    self.target_reached = False
                     self.state_of_planner = self.GO_TO_POINT_STATE
                     self.target_location.z = 0.0
                     self.target_pub.publish(self.target_location)
-                
-
                 elif(self.state_of_planner == self.GO_TO_POINT_STATE):
                     # check reached condition
                     if(self.check_goal_reached()):

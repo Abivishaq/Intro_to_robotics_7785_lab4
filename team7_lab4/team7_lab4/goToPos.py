@@ -35,6 +35,7 @@ class goToPose(Node):
         self.vel_trg = Twist()
         self.pos_err_buffer = 0.1
         self.ang_err_buffer = 0.05
+        self.em_stop_val = 0.5 
         self.reached_target_publisher = self.create_publisher(Point, 'reached_target', 10)
 
         self.target_sub = self.create_subscription(
@@ -108,8 +109,15 @@ class goToPose(Node):
                 ang = 2*math.pi + ang
             ang_index = int((ang-msg.angle_min)/msg.angle_increment)
             dist_to_goal = msg.ranges[ang_index]
-            if(dist_to_goal < 0.2):
+            if(dist_to_goal < self.em_stop_val and self.state == "move"):
                 self.state = "idle"
+                self.non_idle_active = True
+
+            # dist_to_goal = msg.ranges[ang_index]
+            # if(dist_to_goal < self.em_stop_val):
+            #     self.state = "idle"
+            #     self.non_idle_active = True
+            
 
     def go_to_point_update(self, msg):
         if(msg.z==-1.0):
@@ -178,6 +186,9 @@ class goToPose(Node):
                 self.reached_target_publisher.publish(Point(x=self.pos_odom.position.x,y=self.pos_odom.position.y,z=0.0))
                 print("idling: sending 0 vel")
                 self.error_pub.publish(Pose2D(x=0.0,theta=0.0))
+            # self.reached_target_publisher.publish(Point(x=self.pos_odom.position.x,y=self.pos_odom.position.y,z=0.0))
+            # print("idling: sending 0 vel")
+            # self.error_pub.publish(Pose2D(x=0.0,theta=0.0))
         elif(self.state == "move"):
             # self.get_logger().info("Will publish vel to go to goal")
             pos_err, ang_error = self.get_error_to_goal()

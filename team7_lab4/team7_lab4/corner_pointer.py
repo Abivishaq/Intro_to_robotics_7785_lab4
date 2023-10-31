@@ -39,7 +39,7 @@ class GetCornerPoints(Node):
         self.det_angle = None
 
         self.angle_range_of_interest = [-90,90]
-        self.offset = 0.0
+        self.offset = 0.2
 
         # tf variables
         self.tfBuffer = Buffer()
@@ -76,31 +76,84 @@ class GetCornerPoints(Node):
         return [ind1,ind2] 
     
     def transform_point_from_local_to_global(self,point):
-        # get transform from odom to base_link
+        # publish target frame
+        transformStamped = TransformStamped()
+        transformStamped.header.stamp = self.get_clock().now().to_msg()
+        transformStamped.header.frame_id = "base_link"
+        transformStamped.child_frame_id = "traget_frame_tmp"
+        transformStamped.transform.translation.x = point.x
+        transformStamped.transform.translation.y = point.y
+        transformStamped.transform.translation.z = point.z
+        transformStamped.transform.rotation.x = 0.0
+        transformStamped.transform.rotation.y = 0.0
+        transformStamped.transform.rotation.z = 0.0
+        transformStamped.transform.rotation.w = 1.0
+        self.tf_broadcaster.sendTransform(transformStamped)
+
+        # get local goal in base_link frame
         try:
-            transform = self.tfBuffer.lookup_transform('odom', 'base_link', rclpy.time.Time())
+            transform = self.tfBuffer.lookup_transform('odom', 'traget_frame_tmp', rclpy.time.Time())
         except TransformException as ex:
             self.get_logger().info('Could not transform point: ' + str(ex))
             return
-        # transform point from base_link to odom
-        global_target = Point()
-        global_target.x = point.x + transform.transform.translation.x
-        global_target.y = point.y + transform.transform.translation.y 
-        global_target.z = point.z + transform.transform.translation.z
-        return global_target
+        target_point = Point()
+        target_point.x = transform.transform.translation.x
+        target_point.y = transform.transform.translation.y
+        target_point.z = transform.transform.translation.z
+        return target_point
+        # # get transform from odom to base_link
+        # try:
+        #     transform = self.tfBuffer.lookup_transform('odom', 'base_link', rclpy.time.Time())
+        # except TransformException as ex:
+        #     self.get_logger().info('Could not transform point: ' + str(ex))
+        #     return
+        # # transform point from base_link to odom
+        # global_target = Point()
+        # global_target.x = point.x + transform.transform.translation.x
+        # global_target.y = point.y + transform.transform.translation.y 
+        # global_target.z = point.z + transform.transform.translation.z
+        # return global_target
     def transform_point_from_global_to_local(self,point):
-        # get transform from odom to base_link
+        # publish goal frame
+        transformStamped = TransformStamped()
+        transformStamped.header.stamp = self.get_clock().now().to_msg()
+        transformStamped.header.frame_id = "odom"
+        transformStamped.child_frame_id = "goal_frame_tmp"
+        transformStamped.transform.translation.x = point.x
+        transformStamped.transform.translation.y = point.y
+        transformStamped.transform.translation.z = point.z
+        transformStamped.transform.rotation.x = 0.0
+        transformStamped.transform.rotation.y = 0.0
+        transformStamped.transform.rotation.z = 0.0
+        transformStamped.transform.rotation.w = 1.0
+        self.tf_broadcaster.sendTransform(transformStamped)
+
+        # get local goal in base_link frame
         try:
-            transform = self.tfBuffer.lookup_transform('odom', 'base_link', rclpy.time.Time())
+            transform = self.tfBuffer.lookup_transform('base_link', 'goal_frame_tmp', rclpy.time.Time())
         except TransformException as ex:
             self.get_logger().info('Could not transform point: ' + str(ex))
             return
-        # transform point from base_link to odom
-        local_target = Point()
-        local_target.x = point.x - transform.transform.translation.x
-        local_target.y = point.y - transform.transform.translation.y 
-        local_target.z = point.z - transform.transform.translation.z
-        return local_target
+        goal_local = Point()
+        goal_local.x = transform.transform.translation.x
+        goal_local.y = transform.transform.translation.y
+        goal_local.z = transform.transform.translation.z
+        return goal_local
+    
+
+        # # get transform from odom to base_link
+
+        # try:
+        #     transform = self.tfBuffer.lookup_transform('odom', 'base_link', rclpy.time.Time())
+        # except TransformException as ex:
+        #     self.get_logger().info('Could not transform point: ' + str(ex))
+        #     return 
+        # # transform point from base_link to odom
+        # local_target = Point()
+        # local_target.x = point.x - transform.transform.translation.x
+        # local_target.y = point.y - transform.transform.translation.y 
+        # local_target.z = point.z - transform.transform.translation.z
+        # return local_target
 
     def points_topic_callback(self, goal_point):
         print("Got request")
@@ -108,11 +161,18 @@ class GetCornerPoints(Node):
         target_point = Point()
         # goal_point = self.transform_point_from_global_to_local(goal_point)
         goal_point_local = self.transform_point_from_global_to_local(goal_point)
+        while(goal_point_local is None):
+            goal_point.z = -2.0
+            self.corner_point_pub.publish(goal_point)
+            return
+            goal_point_local = self.transform_point_from_global_to_local(goal_point)
+            
+        print("Goal_local:",goal_point_local)
         
         goal_local = (goal_point_local.x,goal_point_local.y)
         ranges = np.array(self.last_scan.ranges)
         dist_to_goal = math.sqrt(goal_point_local.x**2+goal_point_local.y**2)
-        if(ranges[0]>dist_to_goal):
+        if(not(np.any(ranges[0:10]<dist_to_goal) or np.any(ranges[-10:]<dist_to_goal))):
             target_point = goal_point
             print("returning goal")
             self.corner_point_pub.publish(target_point)
@@ -148,7 +208,7 @@ class GetCornerPoints(Node):
                 euc_dists.append(math.dist(goal_local, (x, y)))
             
             elif math.isnan(ranges[i+1]) and not math.isnan(range):
-                x = range * math.cos(self.last_scan.angle_min + i * self.last_scan.angle_increment) + self.offset
+                x = range * math.cos(self.last_scan.angle_min + i * self.last_scan.angle_increment) - self.offset
                 y = range * math.sin(self.last_scan.angle_min + i * self.last_scan.angle_increment) + self.offset
                 waypoints.append((x, y))
                 euc_dists.append(math.dist(goal_local, (x, y)))
@@ -159,9 +219,15 @@ class GetCornerPoints(Node):
         else:
             print("no point of interest found")
 
-        print("Sending target_point")
-        # target_point = self.transform_point_from_local_to_global(target_point)
-        print("target_point:",target_point)
+        # print("Sending target_point")
+        target_point = self.transform_point_from_local_to_global(target_point)
+        # print("target_point:",target_point)
+        while(target_point is None):
+            goal_point.z = -2.0
+            self.corner_point_pub.publish(goal_point)
+            return
+            target_point = self.transform_point_from_local_to_global(target_point)
+ 
         self.corner_point_pub.publish(target_point)
         return        
       
