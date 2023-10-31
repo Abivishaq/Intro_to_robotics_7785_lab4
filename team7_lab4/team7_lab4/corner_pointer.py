@@ -17,6 +17,7 @@ from tf2_ros.transform_listener import TransformListener
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 
 
 class GetCornerPoints(Node):
@@ -28,10 +29,15 @@ class GetCornerPoints(Node):
         #     self.calc_det_angle,
         #     10)
         # QoS Best effor for scan subcrber
-        qos_profile = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=10)
-        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
-        self.point_req_sub = self.create_subscription(Point, 'request_corner_point', self.points_topic_callback, 10)
-        self.corner_point_pub = self.create_publisher(Point, 'corner_point_tpc', 10)
+        self.qos_profile = QoSProfile(
+           depth=10,  # Queue size
+           reliability=QoSReliabilityPolicy.RELIABLE,  # Set reliability to RELIABLE
+           history=QoSHistoryPolicy.KEEP_LAST  # Keep only the last 'depth' number of messages
+           )
+        scan_qos_profile = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=10)
+        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, scan_qos_profile)
+        self.point_req_sub = self.create_subscription(Point, 'request_corner_point', self.points_topic_callback, self.qos_profile)
+        self.corner_point_pub = self.create_publisher(Point, 'corner_point_tpc', self.qos_profile)
         self.scan_sub  # prevent unused variable warning
         # self.points_pub = self.create_publisher(Pose2D,'detection_point_3d',10)
 

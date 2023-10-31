@@ -25,6 +25,9 @@ from sensor_msgs.msg import LaserScan
 import numpy as np
 import math
 
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
+
+
 from team7_mgs_srvs.srv import GoToPointSrv
 class goToPose(Node):
     def __init__(self):
@@ -36,13 +39,19 @@ class goToPose(Node):
         self.pos_err_buffer = 0.1
         self.ang_err_buffer = 0.05
         self.em_stop_val = 0.5 
-        self.reached_target_publisher = self.create_publisher(Point, 'reached_target', 10)
+        self.qos_profile = QoSProfile(
+           depth=10,  # Queue size
+           reliability=QoSReliabilityPolicy.RELIABLE,  # Set reliability to RELIABLE
+           history=QoSHistoryPolicy.KEEP_LAST  # Keep only the last 'depth' number of messages
+           )
+        self.reached_target_publisher = self.create_publisher(Point, 'reached_target', self.qos_profile)
+
 
         self.target_sub = self.create_subscription(
             Point,
             'target_pos',
             self.go_to_point_update,
-            10)
+            self.qos_profile)
         self.odom_sub = self.create_subscription(
             Odometry,
             'odom',

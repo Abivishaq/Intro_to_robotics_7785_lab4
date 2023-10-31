@@ -10,6 +10,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from team7_mgs_srvs.srv import GoToPointSrv,GetTargetSrv
 import math
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 from ament_index_python.packages import get_package_share_directory
 import os
 import sys
@@ -19,7 +20,11 @@ import sys
 class PathPlanner(Node):
     def __init__(self):
         super().__init__('path_planner')
-       
+        self.qos_profile = qos_profile = QoSProfile(
+           depth=10,  # Queue size
+           reliability=QoSReliabilityPolicy.RELIABLE,  # Set reliability to RELIABLE
+           history=QoSHistoryPolicy.KEEP_LAST  # Keep only the last 'depth' number of messages
+           )
         self.dist_threshold = 0.1
         self.goal = None
         wypt_file = '/home/abivishaq/turtle_ws/src/Intro_to_robotics_7785_lab4/team7_lab4/team7_lab4/config/waypoints.txt'
@@ -29,16 +34,16 @@ class PathPlanner(Node):
         self.transition_wait_time = 5
         self.inwait_state = False
     
-        self.target_pub = self.create_publisher(Point, 'target_pos', 10)
+        self.target_pub = self.create_publisher(Point, 'target_pos', self.qos_profile)
         self.reached_trg_sub = self.create_subscription(
             Point,
             'reached_target',
             self.reached_trg_callback,
-            10
+            self.qos_profile
         )
         
-        self.target_request_pub = self.create_publisher(Point, 'request_corner_point', 10)
-        self.rec_target_sub = self.create_subscription(Point, 'corner_point_tpc', self.rec_target_callback, 10)
+        self.target_request_pub = self.create_publisher(Point, 'request_corner_point', self.qos_profile)
+        self.rec_target_sub = self.create_subscription(Point, 'corner_point_tpc', self.rec_target_callback, self.qos_profile)
      
         self.waypoint_reached = True
         self.last_reached_trg = None

@@ -6,15 +6,22 @@ Author2: Abivishaq Balasubramanian
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, Point,Pose2D
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
+
 
 class ChaseObjectNode(Node):
     def __init__(self):
         super().__init__('chase_object')
+        self.qos_profile = qos_profile = QoSProfile(
+           depth=10,  # Queue size
+           reliability=QoSReliabilityPolicy.RELIABLE,  # Set reliability to RELIABLE
+           history=QoSHistoryPolicy.KEEP_LAST  # Keep only the last 'depth' number of messages
+           )
         self.get_object_range_subscriber = self.create_subscription(
             Pose2D,
             '/local_goal',
             self.object_range_callback,
-            10
+            self.qos_profile
         )
 
         self.velocity_publisher = self.create_publisher(
@@ -22,6 +29,7 @@ class ChaseObjectNode(Node):
             'cmd_vel',
             10
         )
+
         self.linear_vel_max= 0.2
         self.angular_vel_max= 1.5
         # Initialize PID control parameters
